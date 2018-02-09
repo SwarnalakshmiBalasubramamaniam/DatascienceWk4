@@ -10,12 +10,22 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## R Markdown
-1.Initially the data is read from the csv file from the working directory
+1.Include the library packages and set the seed
+```
+library(caret)
+  library(ggplot2)
+  library(e1071)
+  library(rpart.plot)
+  library(parallel)
+  library(doParallel)
+  set.seed(42)
+```
+2.Initially the data is read from the csv file in the working directory
 ```
 traindf <- read.csv("pml-training.csv")
 testdf <- read.csv("pml-testing.csv")
 ```
-2.Data is cleaned up by removing NA's and the only the columns in test set are included.
+3.Data is cleaned up by removing NA's and the only the columns in test set are included.
 ```
 testdf<-testdf[,!apply(testdf,2,function(x) all(is.na(x)))]
 vecnames <- colnames(testdf)
@@ -29,42 +39,50 @@ for(i in 1:length(colnames(traindf)))
     }
 }
 ```
-3.The first 6 columns are excluded since it does not add value to the prediction
+4.The first 6 columns are excluded since it does not add value to the prediction
 ```
+filteredtraindf <-subset(traindf,select = c(fname))
+filteredtraindf<-cbind(filteredtraindf,classe=traindf$classe)
 filteredtraindf <- filteredtraindf[,6:ncol(filteredtraindf)]
 ```
-4.The final data set looks like this
+5.The final data set looks like this
 ```
 summary(filteredtraindf)
 ```
-5.We then split the data into test and training set
+6.We then split the data into test and training set
 ```
 inTrain <- createDataPartition(filteredtraindf$classe,p=0.7,list=FALSE)
+trainingset <- filteredtraindf[inTrain,]
+testingset <- filteredtraindf[-inTrain,]
 ```
-6.Once the training set is created we create an model using rpart and predict.
+7.Once the training set is created we create an model using rpart and predict.
 ```
 modFit <- rpart(classe~.,data=trainingset,method="class")
 predictclasse <- predict(modFit,testingset,type="class")
 ```
-7.we then apply that to the testing set and calculate accuracy and out of sample error.
+8.we then apply that to the testing set and calculate accuracy and out of sample error.
 ```
 accuracy <-postResample(predictclasse,testingset$classe)
 outofsampleerr <- 1- confusionMatrix(testingset$classe,predictclasse)$overall[1]
 ```
-8.We later take this training set and using random forest method predict the original test set and use the cross validation method
+The accuracy in the r part method id 0.7350892 and the out of sample error comes to 0.2649108
+
+9.We later take this training set and using random forest method predict the original test set and use the cross validation method. The fold in cross validation is kept at 5
 ```
 controlparam <-  trainControl(method="cv",number = 5)
 modelRF <- train(classe~.,data=trainingset,method="rf",trcontrol=controlparam,ntree=250)
 predictRF <- predict(modelRF, testingset)
 confusionMatrix(testingset$classe, predictRF)
 ```
-9.Once this is done we calculate accuracy and out of sample error.
+10.Once this is done we calculate accuracy and out of sample error.
 ```
 accuracy <- postResample(predictRF, testingset$classe)
 ose <- 1 - as.numeric(confusionMatrix(testingset$classe, predictRF)$overall[1])
 predictrftest<-predict(modelRF, testdf[, -length(names(testdf))])
 ```
-10.After this using the write_files function we write the outputdata to a text file outputdata.txt
+11 The accuracy when calculated using the RF method is 0.9979609 and the out of sample error is 0.002039082.
+The random forest method has a better accuracy for the given data provided and hence is better for the categorical classification
+12.After this using the write_files function we write the outputdata to a text file outputdata.txt
 
 ```
  write_files = function(x){
@@ -75,7 +93,7 @@ predictrftest<-predict(modelRF, testdf[, -length(names(testdf))])
   }
 write_files(predictrftest)
 ```
-11.After this we remove all the variables from memory
+13.After this we remove all the variables from memory
 ```
 rm(modelRF)
 rm(trainingset)
